@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password'])) {
+            session_regenerate_id(true);
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user']    = $user;
             auditLog('login', 'users', $user['id'], 'User logged in');
@@ -71,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </button>
     </form>
     <p class="text-center text-muted mt-4 mb-0" style="font-size:.75rem">
-      Default: <code>admin</code> / <code>Pass123,</code>
+      Default: <code>admin</code> / <code>Library@2024</code>
     </p>
   </div>
 </div>

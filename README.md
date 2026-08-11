@@ -64,7 +64,7 @@ http://localhost/library-system
 ### Step 6 — Login
 ```
 Username: admin
-Password: library@2026
+Password: Library@2024
 ```
 ⚠️ **Change the default password immediately after first login.**
 

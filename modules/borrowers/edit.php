@@ -23,8 +23,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
 
     if (!$data['borrower_id']) $errors[] = 'Borrower ID is required.';
+    elseif (!preg_match('/^\d{8}$/', $data['borrower_id'])) $errors[] = 'Borrower ID must be exactly 8 digits.';
     if (!$data['full_name'])   $errors[] = 'Full name is required.';
     if (!$data['category'])    $errors[] = 'Category is required.';
+    if ($data['phone'] && !preg_match('/^\d{10}$/', $data['phone'])) $errors[] = 'Phone number must be exactly 10 digits.';
     if ($data['email'] && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Invalid email.';
 
     $chk = $pdo->prepare("SELECT id FROM borrowers WHERE borrower_id=? AND id!=?");
@@ -60,7 +62,9 @@ require_once '../../includes/sidebar.php';
           <div class="row g-3">
             <div class="col-md-5">
               <label class="form-label">Borrower ID *</label>
-              <input type="text" name="borrower_id" class="form-control" required value="<?= sanitize($data['borrower_id']) ?>">
+              <input type="text" name="borrower_id" class="form-control" required
+                     pattern="\d{8}" title="Exactly 8 digits"
+                     value="<?= sanitize($data['borrower_id']) ?>">
             </div>
             <div class="col-md-7">
               <label class="form-label">Full Name *</label>
@@ -80,7 +84,7 @@ require_once '../../includes/sidebar.php';
             </div>
             <div class="col-md-6">
               <label class="form-label">Phone</label>
-              <input type="tel" name="phone" class="form-control" value="<?= sanitize($data['phone']??'') ?>">
+              <input type="tel" name="phone" class="form-control" pattern="\d{10}" title="Exactly 10 digits" value="<?= sanitize($data['phone']) ?>">
             </div>
             <div class="col-md-6">
               <label class="form-label">Email</label>

@@ -104,6 +104,10 @@ function daysBorrowed(string $borrowDate, ?string $returnDate): int {
 // ── ID generators ─────────────────────────────────────────────
 function nextId(string $prefix, string $table, string $col): string {
     $pdo  = getDB();
+    // Validate table and column names to prevent SQL injection
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !preg_match('/^[a-zA-Z0-9_]+$/', $col)) {
+        throw new InvalidArgumentException("Invalid table or column name");
+    }
     $stmt = $pdo->query("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(`{$col}`,'- ',-1) AS UNSIGNED)),0)+1 FROM `{$table}`");
     $n    = (int)$stmt->fetchColumn();
     return $prefix . str_pad($n, 3, '0', STR_PAD_LEFT);
@@ -138,7 +142,9 @@ function auditLog(string $action, string $target, int $targetId, string $detail 
         $pdo = getDB();
         $s = $pdo->prepare("INSERT INTO audit_log(user_id,action,target,target_id,detail,ip_address) VALUES(?,?,?,?,?,?)");
         $s->execute([$_SESSION['user_id'] ?? null, $action, $target, $targetId, $detail, $_SERVER['REMOTE_ADDR'] ?? '']);
-    } catch (Exception $e) { /* non-fatal */ }
+    } catch (Exception $e) { 
+        error_log("Audit log failed: " . $e->getMessage());
+    }
 }
 
 function redirect(string $url): never { header("Location: {$url}"); exit; }

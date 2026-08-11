@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS books (
     shelf_location   VARCHAR(60)  DEFAULT NULL,
     status           ENUM('Available','Borrowed','Missing') DEFAULT 'Available',
     condition_status ENUM('Good','Damaged') DEFAULT 'Good',
+    total_copies     INT DEFAULT 1,
+    available_copies INT DEFAULT 1,
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_status(status), INDEX idx_category(category),
     FULLTEXT idx_search(title, author)
@@ -106,3 +108,60 @@ INSERT INTO borrow_records (record_id,book_id,borrower_id,borrow_date,due_date,r
 ('REC-002',12,3,DATE_SUB(CURDATE(),INTERVAL 20 DAY),DATE_ADD(DATE_SUB(CURDATE(),INTERVAL 20 DAY),INTERVAL 14 DAY),NULL,'Not Returned'),
 ('REC-003',1,2,DATE_SUB(CURDATE(),INTERVAL 30 DAY),DATE_ADD(DATE_SUB(CURDATE(),INTERVAL 30 DAY),INTERVAL 14 DAY),DATE_SUB(CURDATE(),INTERVAL 16 DAY),'Returned'),
 ('REC-004',5,4,DATE_SUB(CURDATE(),INTERVAL 10 DAY),DATE_ADD(DATE_SUB(CURDATE(),INTERVAL 10 DAY),INTERVAL 14 DAY),DATE_SUB(CURDATE(),INTERVAL 2 DAY),'Returned');
+-- Fix Books Table ENUMs
+ALTER TABLE books MODIFY COLUMN condition_status ENUM('Perfect', 'Good', 'Mildly Torn', 'Torn', 'Damaged') DEFAULT 'Good';
+ALTER TABLE books MODIFY COLUMN status ENUM('Available','Borrowed','Missing','All Issued','Not Available') DEFAULT 'Available';
+
+-- Fix Borrow Records Table
+ALTER TABLE borrow_records ADD COLUMN condition_on_borrow ENUM('Perfect', 'Good', 'Mildly Torn', 'Torn', 'Damaged') NOT NULL DEFAULT 'Good';
+ALTER TABLE borrow_records ADD COLUMN condition_on_return ENUM('Perfect', 'Good', 'Mildly Torn', 'Torn', 'Damaged') DEFAULT NULL;
+
+-- Create missing book_condition_log table
+CREATE TABLE IF NOT EXISTS book_condition_log (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    book_id INT UNSIGNED NOT NULL,
+    record_id INT UNSIGNED DEFAULT NULL,
+    event_type ENUM('Borrowed', 'Returned', 'Manual Check') NOT NULL,
+    condition_noted ENUM('Perfect', 'Good', 'Mildly Torn', 'Torn', 'Damaged') NOT NULL,
+    noted_by INT UNSIGNED DEFAULT NULL,
+    remarks VARCHAR(500) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+-- Drop triggers if they exist just in case
+DROP TRIGGER IF EXISTS trg_books_sync_status;
+DROP TRIGGER IF EXISTS trg_condition_escalate;
+
+-- Create missing triggers
+DELIMITER //
+CREATE TRIGGER trg_books_sync_status BEFORE UPDATE ON books
+FOR EACH ROW
+BEGIN
+    IF NEW.status NOT IN ('Missing', 'Not Available') THEN
+        IF NEW.available_copies <= 0 THEN
+            SET NEW.status = 'All Issued';
+        ELSEIF NEW.available_copies > 0 AND OLD.available_copies <= 0 THEN
+            SET NEW.status = 'Available';
+        END IF;
+    END IF;
+END; //
+
+CREATE TRIGGER trg_condition_escalate AFTER UPDATE ON borrow_records
+FOR EACH ROW
+BEGIN
+    IF NEW.status = 'Returned' AND OLD.status = 'Not Returned' AND NEW.condition_on_return IS NOT NULL THEN
+        UPDATE books SET condition_status = NEW.condition_on_return WHERE id = NEW.book_id;
+    END IF;
+END; //
+DELIMITER ;
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED DEFAULT NULL,
+    action VARCHAR(50) NOT NULL,
+    target VARCHAR(50) NOT NULL,
+    target_id INT UNSIGNED DEFAULT NULL,
+    detail TEXT DEFAULT NULL,
+    ip_address VARCHAR(45) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;

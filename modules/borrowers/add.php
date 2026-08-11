@@ -17,8 +17,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
 
     if (!$data['borrower_id']) $errors[] = 'Borrower ID is required.';
+    elseif (!preg_match('/^\d{8}$/', $data['borrower_id'])) $errors[] = 'Borrower ID must be exactly 8 digits.';
     if (!$data['full_name'])   $errors[] = 'Full name is required.';
     if (!$data['category'])    $errors[] = 'Category is required.';
+    if ($data['phone'] && !preg_match('/^\d{10}$/', $data['phone'])) $errors[] = 'Phone number must be exactly 10 digits.';
     if ($data['email'] && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Invalid email address.';
 
     if ($data['borrower_id']) {
@@ -35,14 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('success','Borrower added successfully!');
         redirect(BASE_URL.'/modules/borrowers/index.php');
     }
-}
-
-$catPrefix = ['Student'=>'STU-','Teacher'=>'TCH-','Staff'=>'STF-'];
-$suggested = [];
-foreach ($catPrefix as $cat => $pfx) {
-    $n = $pdo->prepare("SELECT COUNT(*) FROM borrowers WHERE category=?");
-    $n->execute([$cat]);
-    $suggested[$cat] = $pfx . str_pad((int)$n->fetchColumn()+1, 3,'0',STR_PAD_LEFT);
 }
 
 require_once '../../includes/header.php';
@@ -65,9 +59,10 @@ require_once '../../includes/sidebar.php';
           <div class="row g-3">
             <div class="col-md-5">
               <label class="form-label">Borrower ID *</label>
-              <input type="text" name="borrower_id" id="borrowerId" class="form-control" required
-                     value="<?= sanitize($data['borrower_id'] ?? $suggested['Student']) ?>">
-              <div class="form-text" id="idHint">Suggested for Student: <strong><?= $suggested['Student'] ?></strong></div>
+              <input type="text" name="borrower_id" id="borrowerId" class="form-control" required 
+                     pattern="\d{8}" title="Exactly 8 digits"
+                     value="<?= sanitize($data['borrower_id'] ?? '') ?>" placeholder="e.g. 10293847">
+              <div id="idHint" class="form-text">Must be exactly 8 digits.</div>
             </div>
             <div class="col-md-7">
               <label class="form-label">Full Name *</label>
@@ -89,7 +84,7 @@ require_once '../../includes/sidebar.php';
             </div>
             <div class="col-md-6">
               <label class="form-label">Phone</label>
-              <input type="tel" name="phone" class="form-control" value="<?= sanitize($data['phone'] ?? '') ?>">
+              <input type="tel" name="phone" class="form-control" pattern="\d{10}" title="Exactly 10 digits" placeholder="e.g. 0541234567" value="<?= sanitize($data['phone'] ?? '') ?>">
             </div>
             <div class="col-md-6">
               <label class="form-label">Email</label>
@@ -113,14 +108,3 @@ require_once '../../includes/sidebar.php';
   </div>
 </div>
 <?php require_once '../../includes/footer.php'; ?>
-<script>
-// Auto-suggest borrower ID based on category
-const suggested = <?= json_encode($suggested) ?>;
-document.getElementById('categorySelect').addEventListener('change', function() {
-    const cat = this.value;
-    if (suggested[cat]) {
-        document.getElementById('borrowerId').value = suggested[cat];
-        document.getElementById('idHint').innerHTML = 'Suggested for '+cat+': <strong>'+suggested[cat]+'</strong>';
-    }
-});
-</script>
